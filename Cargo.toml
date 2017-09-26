@@ -1,0 +1,7 @@
+[package]
+name = "mangy"
+version = "0.1.0"
+authors = ["RyanBluth <ryanbluth93@gmail.com>"]
+
+[dependencies]
+clap = "2.26.2"
