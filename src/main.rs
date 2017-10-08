@@ -14,6 +14,7 @@ const KEY: &'static str = "key";
 const VALUE: &'static str = "value";
 const LIST: &'static str = "list";
 const RUN: &'static str = "run";
+const RUN_ARGS: &'static str = "run_args";
 const PROPS_FILE: &'static str = ".mangyprops";
 
 struct GenericError {
@@ -27,8 +28,8 @@ impl GenericError {
 }
 
 impl<T> From<T> for GenericError
-where
-    T: Display,
+    where
+        T: Display,
 {
     fn from(x: T) -> Self {
         return GenericError::new(format!("{}", x));
@@ -63,9 +64,15 @@ fn main() {
                     Arg::with_name(KEY)
                         .help("Variable key")
                         .required(true)
-                        .index(1),
-                ),
+                        .index(1), )
+                .arg(
+                    Arg::with_name(RUN_ARGS)
+                        .help("Arguments to pass to the command stored in the variable matching the provided key")
+                        .required(false)
+                        .multiple(true)
+                )
         )
+
         .subcommand(
             SubCommand::with_name(SET)
                 .alias("s")
@@ -99,7 +106,7 @@ fn main() {
         list();
     } else if let Some(sub_matches) = matches.subcommand_matches(RUN) {
         match sub_matches.value_of(KEY) {
-            Some(key) => run(key),
+            Some(key) => run(key, sub_matches.values_of_lossy(RUN_ARGS)),
             None => exit_with_message("go requires a variable key"),
         }
     }
@@ -117,11 +124,18 @@ fn list() {
     }
 }
 
-fn run(key: &str) {
+fn run(key: &str, args: Option<Vec<String>>) {
     match lookup(key) {
         Ok(opt) => match opt {
             Some(value) => {
-                let mut value_it = value.split_whitespace();
+                let mut sub = value.clone();
+                if let Some(arg_vec) = args{
+                    for i in 0..arg_vec.len(){
+                        let token = format!("${}", i);
+                        sub = sub.replace(token.as_str(), arg_vec[i].as_str());
+                    }
+                }
+                let mut value_it = sub.split_whitespace();
                 if let Err(e) = Command::new(value_it.next().unwrap()).args(value_it).spawn() {
                     exit_with_message(format!("Failed to execute {}. Error: {}", value, e));
                 };
@@ -168,13 +182,13 @@ fn set(key: &str, mut values: clap::Values) {
         .truncate(true)
         .read(true)
         .open(get_file_dir())
-    {
-        Ok(file) => file,
-        Err(e) => {
-            exit_with_message(format!("Failed to create file .mangyprops. Error: {}", e));
-            return;
-        }
-    };
+        {
+            Ok(file) => file,
+            Err(e) => {
+                exit_with_message(format!("Failed to create file .mangyprops. Error: {}", e));
+                return;
+            }
+        };
     if let Err(e) = file.write_all(out.as_bytes()) {
         exit_with_message(format!(
             "Failed to write value to .mangyprops. Error: {}",
@@ -189,7 +203,7 @@ fn lookup(key: &str) -> Result<Option<String>, GenericError> {
         Err(e) => {
             return Err(GenericError::new(
                 format!("Failed to open file .mangyprops. Error: {}", e),
-            ))
+            ));
         }
     };
     let mut buf = String::new();
@@ -219,7 +233,7 @@ fn get_file_contents() -> String {
     return buf;
 }
 
-fn get_file_dir()->String{
+fn get_file_dir() -> String {
     let mut exe_path = std::env::current_exe().unwrap();
     exe_path.pop();
     exe_path.push(PROPS_FILE);
@@ -237,8 +251,8 @@ fn invalid_key(key: &str) {
 
 
 fn exit_with_message<T>(message: T)
-where
-    T: Display,
+    where
+        T: Display,
 {
     println!("{}", message);
     process::exit(1);
