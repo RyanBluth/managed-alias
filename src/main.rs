@@ -4,7 +4,7 @@ use clap::{App, AppSettings, Arg, SubCommand};
 
 use std::process;
 use std::fmt::Display;
-use std::fs::{File, OpenOptions};
+use std::fs::{File, OpenOptions, metadata};
 use std::io::prelude::*;
 use std::process::Command;
 
@@ -17,6 +17,7 @@ const RUN: &'static str = "run";
 const RUN_ARGS: &'static str = "run_args";
 const PROPS_FILE: &'static str = ".mangyprops";
 
+#[derive(Debug)]
 struct GenericError {
     description: String,
 }
@@ -40,6 +41,17 @@ fn main() {
     let matches = App::new("mangy")
         .version("1.0")
         .author("Ryan Bluth")
+        .arg(
+            Arg::with_name(KEY)
+                    .help("Variable key")
+                    .required(false)
+                    .index(1), )
+            .arg(
+                Arg::with_name(RUN_ARGS)
+                    .help("Arguments to pass to the command stored in the variable matching the provided key")
+                    .required(false)
+                    .multiple(true)
+            )
         .subcommand(
             SubCommand::with_name(GO)
                 .alias("g")
@@ -109,18 +121,49 @@ fn main() {
             Some(key) => run(key, sub_matches.values_of_lossy(RUN_ARGS)),
             None => exit_with_message("go requires a variable key"),
         }
+    } else if let Some(key) = matches.value_of(KEY) {
+        let value = lookup(key);
+        match value{
+            Ok(value) => {
+                if let Some(value) = value{
+                    let metadata = metadata(value);
+                    match metadata{
+                        Ok(_) => go(key),
+                        Err(_) =>  run(key, matches.values_of_lossy(RUN_ARGS))
+                    }
+                }else{
+                    exit_with_message(format!("Invalid key {}", key))
+                }
+            }
+            Err(e) => exit_with_message(format!("Error: {}", e.description))
+        }
     }
 }
 
 fn list() {
     let file_contents = get_file_contents();
+    let mut keys = vec![];
+    let mut values = vec![];
+    let mut longest_key = 0;
     for line in file_contents.split('\n') {
         let mut split = line.split("\":\"");
-        let key = split.next();
-        let val = split.last();
-        if val.is_some() && key.is_some() {
-            println!("{}={}", key.unwrap(), val.unwrap());
+        let key_opt = split.next();
+        let val_opt = split.last();
+        if val_opt.is_some() && key_opt.is_some() {
+            let key = key_opt.unwrap();
+            let val = val_opt.unwrap();
+            if key.len() > longest_key{
+                longest_key = key.len();
+            }
+            keys.push(key);
+            values.push(val);
         }
+    }
+    for pair in keys.iter().zip(values){
+        let key = pair.0;
+        let val = pair.1;
+        let padding = str::repeat(" ", longest_key - key.len());
+        println!("{}{} = {}", padding, key, val);
     }
 }
 
@@ -149,7 +192,7 @@ fn run(key: &str, args: Option<Vec<String>>) {
 fn go(key: &str) {
     match lookup(key) {
         Ok(opt) => match opt {
-            Some(value) => println!("{}", value),
+            Some(value) => println!("*{}", value),
             None => invalid_key(key),
         },
         Err(e) => exit_with_message(e.description),
