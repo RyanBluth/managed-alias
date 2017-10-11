@@ -1,6 +1,6 @@
-out= $($HOME/.mangy/mangy $@)
-if [ "$1" == "g" ] || [ "$1" == "go" ] ; then 
-    cd "$out"
+out=$($HOME/.mangy/mangy $@)
+if [[ $out == \** ]] ; then
+    cd "${out#\*}"
 else
     echo "$out"
 fi

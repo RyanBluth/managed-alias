@@ -45,13 +45,14 @@ fn main() {
             Arg::with_name(KEY)
                     .help("Variable key")
                     .required(false)
-                    .index(1), )
-            .arg(
-                Arg::with_name(RUN_ARGS)
-                    .help("Arguments to pass to the command stored in the variable matching the provided key")
-                    .required(false)
-                    .multiple(true)
-            )
+                    .index(1)
+        )
+        .arg(
+            Arg::with_name(RUN_ARGS)
+                .help("Arguments to pass to the command stored in the variable matching the provided key")
+                .required(false)
+                .multiple(true)
+        )
         .subcommand(
             SubCommand::with_name(GO)
                 .alias("g")
