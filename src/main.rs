@@ -41,6 +41,7 @@ fn main() {
     let matches = App::new("mangy")
         .version("1.0")
         .author("Ryan Bluth")
+        .setting(AppSettings::ArgsNegateSubcommands)
         .arg(
             Arg::with_name(KEY)
                     .help("Variable key")
@@ -85,7 +86,6 @@ fn main() {
                         .multiple(true)
                 )
         )
-
         .subcommand(
             SubCommand::with_name(SET)
                 .alias("s")
