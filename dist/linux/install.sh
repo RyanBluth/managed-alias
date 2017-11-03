@@ -12,7 +12,7 @@ echo -e "\nfunction ma() {\n\
 export -f ma" | tee -a $HOME/.bashrc
 fi
 
-mkdir $MA_HOME
+mkdir -p $MA_HOME
 
 cp ./../../managed-alias.sh $MA_HOME/managed-alias.sh
 cp ./managed-alias $MA_HOME/managed-alias

@@ -286,8 +286,6 @@ fn get_key_value_pairs() -> Vec<(String, String)> {
         let val = key_val.next();
         if key.is_some() && val.is_some() {
             result.push((String::from(key.unwrap()), String::from(val.unwrap())));
-        } else {
-            exit_with_message(format!("Failed to parse {}", PROPS_FILE));
         }
     }
     return result;

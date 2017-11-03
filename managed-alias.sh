@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-out=$($HOME/.managed-alias/managed-alias $@)
+out=$($MA_HOME/managed-alias $@)
 if [[ $out == \** ]] ; then
     cd "${out#\*}"
 else
