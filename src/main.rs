@@ -15,7 +15,8 @@ const VALUE: &'static str = "value";
 const LIST: &'static str = "list";
 const RUN: &'static str = "run";
 const RUN_ARGS: &'static str = "run_args";
-const PROPS_FILE: &'static str = ".mangyprops";
+const DELETE: &'static str = "delete";
+const PROPS_FILE: &'static str = ".managed-alias-store";
 
 #[derive(Debug)]
 struct GenericError {
@@ -38,15 +39,15 @@ impl<T> From<T> for GenericError
 }
 
 fn main() {
-    let matches = App::new("mangy")
+    let matches = App::new("managed-alias")
         .version("1.0")
         .author("Ryan Bluth")
         .setting(AppSettings::ArgsNegateSubcommands)
         .arg(
             Arg::with_name(KEY)
-                    .help("Variable key")
-                    .required(false)
-                    .index(1)
+                .help("Variable key")
+                .required(false)
+                .index(1)
         )
         .arg(
             Arg::with_name(RUN_ARGS)
@@ -100,6 +101,11 @@ fn main() {
                         .allow_hyphen_values(true),
                 ),
         )
+        .subcommand(SubCommand::with_name(DELETE)
+            .alias("d")
+            .about("Delete a key value pair")
+            .arg(Arg::with_name(KEY).help("Variable key").required(true))
+        )
         .get_matches();
 
     if let Some(sub_matches) = matches.subcommand_matches(GO) {
@@ -122,21 +128,22 @@ fn main() {
             Some(key) => run(key, sub_matches.values_of_lossy(RUN_ARGS)),
             None => exit_with_message("go requires a variable key"),
         }
+    } else if let Some(sub_matches) = matches.subcommand_matches(DELETE) {
+        match sub_matches.value_of(KEY) {
+            Some(key) => delete(key),
+            None => exit_with_message("Delete requires a variable key")
+        }
     } else if let Some(key) = matches.value_of(KEY) {
         let value = lookup(key);
-        match value{
-            Ok(value) => {
-                if let Some(value) = value{
-                    let metadata = metadata(value);
-                    match metadata{
-                        Ok(_) => go(key),
-                        Err(_) =>  run(key, matches.values_of_lossy(RUN_ARGS))
-                    }
-                }else{
-                    exit_with_message(format!("Invalid key {}", key))
-                }
+
+        if let Some(value) = value {
+            let metadata = metadata(value);
+            match metadata {
+                Ok(_) => go(key),
+                Err(_) => run(key, matches.values_of_lossy(RUN_ARGS))
             }
-            Err(e) => exit_with_message(format!("Error: {}", e.description))
+        } else {
+            exit_with_message(format!("Invalid key {}", key))
         }
     }
 }
@@ -153,14 +160,14 @@ fn list() {
         if val_opt.is_some() && key_opt.is_some() {
             let key = key_opt.unwrap();
             let val = val_opt.unwrap();
-            if key.len() > longest_key{
+            if key.len() > longest_key {
                 longest_key = key.len();
             }
             keys.push(key);
             values.push(val);
         }
     }
-    for pair in keys.iter().zip(values){
+    for pair in keys.iter().zip(values) {
         let key = pair.0;
         let val = pair.1;
         let padding = str::repeat(" ", longest_key - key.len());
@@ -170,33 +177,27 @@ fn list() {
 
 fn run(key: &str, args: Option<Vec<String>>) {
     match lookup(key) {
-        Ok(opt) => match opt {
-            Some(value) => {
-                let mut sub = value.clone();
-                if let Some(arg_vec) = args{
-                    for i in 0..arg_vec.len(){
-                        let token = format!("${}", i);
-                        sub = sub.replace(token.as_str(), arg_vec[i].as_str());
-                    }
+        Some(value) => {
+            let mut sub = value.clone();
+            if let Some(arg_vec) = args {
+                for i in 0..arg_vec.len() {
+                    let token = format!("${}", i);
+                    sub = sub.replace(token.as_str(), arg_vec[i].as_str());
                 }
-                let mut value_it = sub.split_whitespace();
-                if let Err(e) = Command::new(value_it.next().unwrap()).args(value_it).spawn() {
-                    exit_with_message(format!("Failed to execute {}. Error: {}", value, e));
-                };
             }
-            None => invalid_key(key),
-        },
-        Err(e) => exit_with_message(e.description),
+            let mut value_it = sub.split_whitespace();
+            if let Err(e) = Command::new(value_it.next().unwrap()).args(value_it).spawn() {
+                exit_with_message(format!("Failed to execute {}. Error: {}", value, e));
+            };
+        }
+        None => invalid_key(key)
     }
 }
 
 fn go(key: &str) {
     match lookup(key) {
-        Ok(opt) => match opt {
-            Some(value) => println!("*{}", value),
-            None => invalid_key(key),
-        },
-        Err(e) => exit_with_message(e.description),
+        Some(value) => println!("*{}", value),
+        None => invalid_key(key),
     }
 }
 
@@ -229,40 +230,30 @@ fn set(key: &str, mut values: clap::Values) {
         {
             Ok(file) => file,
             Err(e) => {
-                exit_with_message(format!("Failed to create file .mangyprops. Error: {}", e));
+                exit_with_message(format!("Failed to create file .managedaliasprops. Error: {}", e));
                 return;
             }
         };
     if let Err(e) = file.write_all(out.as_bytes()) {
         exit_with_message(format!(
-            "Failed to write value to .mangyprops. Error: {}",
+            "Failed to write value to .managedaliasprops. Error: {}",
             e
         ));
     };
 }
 
-fn lookup(key: &str) -> Result<Option<String>, GenericError> {
-    let mut file: File = match File::open(get_file_dir()) {
-        Ok(file) => file,
-        Err(e) => {
-            return Err(GenericError::new(
-                format!("Failed to open file .mangyprops. Error: {}", e),
-            ));
-        }
-    };
-    let mut buf = String::new();
-    file.read_to_string(&mut buf)?;
-    let lines = buf.split('\n');
-    for line in lines {
-        let mut key_val = line.split("\":\"");
-        if let Some(line_key) = key_val.next() {
-            if key == line_key {
-                let value = key_val.last().unwrap();
-                return Ok(Some(String::from(value)));
-            }
+fn delete(key: &str) {
+    let file_contents = get_file_contents();
+}
+
+fn lookup(key: &str) -> Option<String> {
+    let key_value_pairs = get_key_value_pairs();
+    for pair in key_value_pairs {
+        if pair.0 == key {
+            return Some(pair.1);
         }
     }
-    Ok(None)
+    None
 }
 
 fn get_file_contents() -> String {
@@ -283,6 +274,23 @@ fn get_file_dir() -> String {
     exe_path.push(PROPS_FILE);
     let path = String::from(exe_path.to_path_buf().to_string_lossy());
     return path;
+}
+
+fn get_key_value_pairs() -> Vec<(String, String)> {
+    let mut result = vec![];
+    let contents = get_file_contents();
+    let lines = contents.split('\n');
+    for line in lines {
+        let mut key_val = line.split("\":\"");
+        let key = key_val.next();
+        let val = key_val.next();
+        if key.is_some() && val.is_some() {
+            result.push((String::from(key.unwrap()), String::from(val.unwrap())));
+        } else {
+            exit_with_message(format!("Failed to parse {}", PROPS_FILE));
+        }
+    }
+    return result;
 }
 
 fn format_key_val<'a>(key: &str, val: &str) -> String {

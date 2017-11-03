@@ -1,5 +1,5 @@
 [package]
-name = "mangy"
+name = "managed-alias"
 version = "0.1.0"
 authors = ["RyanBluth <ryanbluth93@gmail.com>"]
 

@@ -1,15 +1,18 @@
-if ! [[ -n "$MANGY_HOME" ]] ; then
-    echo -e "\nexport MANGY_HOME=\$HOME/.mangy" | tee -a $HOME/.bashrc
-    echo -e '\nPATH="$MANGY_HOME:$PATH"' | tee -a $HOME/.bashrc
-    export MANGY_HOME=$HOME/.mangy
+#!/usr/bin/env bash
+if ! [[ -n "$MA_HOME" ]] ; then
+    echo -e "\nexport MA_HOME=\$HOME/.managed-alias" | tee -a $HOME/.bashrc
+    echo -e '\nPATH="$MA_HOME:$PATH"' | tee -a $HOME/.bashrc
+    export MA_HOME=$HOME/.managed-alias
 fi
 
-if ! [ -n "$(type -t mangy)" ] && ! [ "$(type -t mangy)" = function ] ; then
-echo -e "\nfunction mangy() {\n\
-  . \$MANGY_HOME/mangy.sh $@\n\
+if ! [ -n "$(type -t ma)" ] && ! [ "$(type -t ma)" = function ] ; then
+echo -e "\nfunction ma() {\n\
+  . \$MA_HOME/managed-alias.sh $@\n\
 }\n\
-export -f mangy" | tee -a $HOME/.bashrc
+export -f ma" | tee -a $HOME/.bashrc
 fi
 
-cp ./mangy.sh $MANGY_HOME/mangy.sh
-cp ./mangy $MANGY_HOME/mangy
+mkdir $MA_HOME
+
+cp ./../../managed-alias.sh $MA_HOME/managed-alias.sh
+cp ./managed-alias $MA_HOME/managed-alias
