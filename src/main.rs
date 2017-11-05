@@ -7,6 +7,7 @@ use std::fmt::Display;
 use std::fs::{File, OpenOptions, metadata};
 use std::io::prelude::*;
 use std::process::Command;
+use std::collections::HashMap;
 
 const GO: &'static str = "go";
 const SET: &'static str = "set";
@@ -16,7 +17,7 @@ const LIST: &'static str = "list";
 const RUN: &'static str = "run";
 const RUN_ARGS: &'static str = "run_args";
 const DELETE: &'static str = "delete";
-const PROPS_FILE: &'static str = ".managed-alias-store";
+const STORE_FILE: &'static str = ".managed-alias-store";
 
 #[derive(Debug)]
 struct GenericError {
@@ -37,6 +38,7 @@ impl<T> From<T> for GenericError
         return GenericError::new(format!("{}", x));
     }
 }
+
 
 fn main() {
     let matches = App::new("managed-alias")
@@ -149,29 +151,17 @@ fn main() {
 }
 
 fn list() {
-    let file_contents = get_file_contents();
-    let mut keys = vec![];
-    let mut values = vec![];
+    let entries = get_entries();
     let mut longest_key = 0;
-    for line in file_contents.split('\n') {
-        let mut split = line.split("\":\"");
-        let key_opt = split.next();
-        let val_opt = split.last();
-        if val_opt.is_some() && key_opt.is_some() {
-            let key = key_opt.unwrap();
-            let val = val_opt.unwrap();
-            if key.len() > longest_key {
-                longest_key = key.len();
-            }
-            keys.push(key);
-            values.push(val);
+
+    for entry in &entries {
+        if entry.0.len() > longest_key {
+            longest_key = entry.0.len();
         }
     }
-    for pair in keys.iter().zip(values) {
-        let key = pair.0;
-        let val = pair.1;
-        let padding = str::repeat(" ", longest_key - key.len());
-        println!("{}{} = {}", padding, key, val);
+    for entry in entries {
+        let padding = str::repeat(" ", longest_key - entry.0.len());
+        println!("{}{} = {}", padding, entry.0, entry.1);
     }
 }
 
@@ -190,70 +180,42 @@ fn run(key: &str, args: Option<Vec<String>>) {
                 exit_with_message(format!("Failed to execute {}. Error: {}", value, e));
             };
         }
-        None => invalid_key(key)
+        None => exit_invalid_key(key)
     }
 }
 
 fn go(key: &str) {
     match lookup(key) {
         Some(value) => println!("*{}", value),
-        None => invalid_key(key),
+        None => exit_invalid_key(key),
     }
 }
 
 fn set(key: &str, mut values: clap::Values) {
-    let buf = get_file_contents();
+    let mut entries = get_entries();
     let mut combined = String::from(values.next().unwrap());
     for v in values {
         combined.push_str(" ");
         combined.push_str(v);
     }
-    let mut out = String::new();
-    let mut overwritten = false;
-    for line in buf.lines() {
-        if line.starts_with(key) {
-            out += &format_key_val(key, combined.as_str());
-            overwritten = true;
-        } else {
-            out += &format!("{}\n", line);
-        }
-    }
-    if !overwritten {
-        out += &format_key_val(key, combined.as_str());
-    }
-    let mut file = match OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .read(true)
-        .open(get_file_dir())
-        {
-            Ok(file) => file,
-            Err(e) => {
-                exit_with_message(format!("Failed to create file .managedaliasprops. Error: {}", e));
-                return;
-            }
-        };
-    if let Err(e) = file.write_all(out.as_bytes()) {
-        exit_with_message(format!(
-            "Failed to write value to .managedaliasprops. Error: {}",
-            e
-        ));
-    };
+    entries.insert(String::from(key), combined);
+    write_entries(entries);
 }
 
 fn delete(key: &str) {
-    let file_contents = get_file_contents();
+    let mut entries = get_entries();
+    entries.remove(&String::from(key));
+    write_entries(entries);
 }
 
 fn lookup(key: &str) -> Option<String> {
-    let key_value_pairs = get_key_value_pairs();
-    for pair in key_value_pairs {
-        if pair.0 == key {
-            return Some(pair.1);
-        }
+    let entries = get_entries();
+    match entries.get(&String::from(key)){
+        None => None,
+        Some(entry) => {
+            Some(entry.clone())
+        },
     }
-    None
 }
 
 fn get_file_contents() -> String {
@@ -271,34 +233,59 @@ fn get_file_contents() -> String {
 fn get_file_dir() -> String {
     let mut exe_path = std::env::current_exe().unwrap();
     exe_path.pop();
-    exe_path.push(PROPS_FILE);
+    exe_path.push(STORE_FILE);
     let path = String::from(exe_path.to_path_buf().to_string_lossy());
     return path;
 }
 
-fn get_key_value_pairs() -> Vec<(String, String)> {
-    let mut result = vec![];
+fn get_entries() -> HashMap<String, String> {
+    let mut result:HashMap<String, String> = HashMap::new();
     let contents = get_file_contents();
     let lines = contents.split('\n');
     for line in lines {
-        let mut key_val = line.split("\":\"");
-        let key = key_val.next();
-        let val = key_val.next();
+        let mut pair = line.split("\":\"");
+        let key = pair.next();
+        let val = pair.next();
         if key.is_some() && val.is_some() {
-            result.push((String::from(key.unwrap()), String::from(val.unwrap())));
+            result.insert(String::from(key.unwrap()), String::from(val.unwrap()));
         }
     }
     return result;
 }
 
-fn format_key_val<'a>(key: &str, val: &str) -> String {
-    format!("{}\":\"{}\n", key, val)
+fn write_entries(entries: HashMap<String, String>) {
+    let mut out = String::new();
+    for entry in entries {
+        out.push_str(format_entry(&entry.0, &entry.1).as_str());
+    }
+    let mut file = match OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .read(true)
+        .open(get_file_dir())
+        {
+            Ok(file) => file,
+            Err(e) => {
+                exit_with_message(format!("Failed to create file {}. Error: {}", STORE_FILE, e));
+                return;
+            }
+        };
+    if let Err(e) = file.write_all(out.as_bytes()) {
+        exit_with_message(format!(
+            "Failed to write value to {}. Error: {}",
+            STORE_FILE, e
+        ));
+    };
 }
 
-fn invalid_key(key: &str) {
+fn format_entry(key:&String, val:&String) -> String {
+    return format!("{}\":\"{}\n", key, val);
+}
+
+fn exit_invalid_key(key: &str) {
     exit_with_message(format!("No value was found for key '{}'", key));
 }
-
 
 fn exit_with_message<T>(message: T)
     where
