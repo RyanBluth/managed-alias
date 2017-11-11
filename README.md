@@ -1,6 +1,6 @@
 # managed-alias
 
-managed-alias is an alternative to the alias command. managed-alias allows you to maintain a list of aliases that you can modify on the file and is persitent across terminal sessions.
+managed-alias is an alternative to the alias command. managed-alias allows you to maintain a list of aliases that you can modify on the fly and is persitent across terminal sessions.
 
 
 | Command                | Result                                                                                                                                                                           |
