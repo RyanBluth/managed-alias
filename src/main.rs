@@ -168,15 +168,28 @@ fn list() {
 fn run(key: &str, args: Option<Vec<String>>) {
     match lookup(key) {
         Some(value) => {
-            let mut sub = value.clone();
+            let split_value = value.split_whitespace();
+            let mut joined_args = String::new();
+            let mut out_args = vec![];
             if let Some(arg_vec) = args {
-                for i in 0..arg_vec.len() {
-                    let token = format!("${}", i);
-                    sub = sub.replace(token.as_str(), arg_vec[i].as_str());
+                for arg in &arg_vec {
+                    joined_args.push_str(arg.as_str());
+                    joined_args.push(' ');
+                }
+                joined_args.pop();
+
+                for v in split_value{
+                    let mut current = String::from(v);
+                    for i in 0..arg_vec.len() {
+                        let token = format!("${}", i);
+                        current = current.replace(token.as_str(), arg_vec[i].as_str());
+                    }
+                    current = current.replace("$*", joined_args.as_str());
+                    out_args.push(current);
                 }
             }
-            let mut value_it = sub.split_whitespace();
-            if let Err(e) = Command::new(value_it.next().unwrap()).args(value_it).spawn() {
+            let mut arg_iter = out_args.iter();
+            if let Err(e) = Command::new(arg_iter.next().unwrap()).args(arg_iter).spawn() {
                 exit_with_message(format!("Failed to execute {}. Error: {}", value, e));
             };
         }
