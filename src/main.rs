@@ -6,7 +6,7 @@ use std::process;
 use std::fmt::Display;
 use std::fs::{File, OpenOptions, metadata};
 use std::io::prelude::*;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::collections::HashMap;
 
 const GO: &'static str = "go";
@@ -168,30 +168,42 @@ fn list() {
 fn run(key: &str, args: Option<Vec<String>>) {
     match lookup(key) {
         Some(value) => {
-            let split_value = value.split_whitespace();
-            let mut joined_args = String::new();
-            let mut out_args = vec![];
-            if let Some(arg_vec) = args {
-                for arg in &arg_vec {
-                    joined_args.push_str(arg.as_str());
-                    joined_args.push(' ');
-                }
-                joined_args.pop();
-
-                for v in split_value{
-                    let mut current = String::from(v);
-                    for i in 0..arg_vec.len() {
-                        let token = format!("${}", i);
-                        current = current.replace(token.as_str(), arg_vec[i].as_str());
+            for command in value.split("&"){
+                let mut out_args:Vec<String> = command
+                    .split_whitespace()
+                    .map(|s|String::from(s))
+                    .collect::<Vec<String>>();
+                if let Some(arg_vec) = args.clone(){
+                    let mut joined_args = String::new();
+                    for arg in &arg_vec {
+                        joined_args.push_str(arg.clone().as_str());
+                        joined_args.push(' ');
                     }
-                    current = current.replace("$*", joined_args.as_str());
-                    out_args.push(current);
+                    joined_args.pop();
+
+                    for arg in out_args.clone().iter().enumerate(){
+                        let mut current = arg.1.clone();
+                        for i in 0..arg_vec.len() {
+                            let token = format!("${}", i);
+                            current = current.replace(token.as_str(), arg_vec[i].as_str());
+                        }
+                        current = current.replace("$*", joined_args.as_str());
+                        out_args[arg.0] = current;
+                    }
                 }
+                let mut arg_iter = out_args.iter();
+                match Command::new(arg_iter.next().unwrap())
+                            .args(arg_iter)
+                            .stdout(Stdio::inherit())
+                            .spawn(){
+                    Ok(mut child) => {
+                        if let Err(e) = child.wait(){
+                            exit_with_message(format!("Failed to wait for command {}. Error: {}", command, e));
+                        }
+                    },
+                    Err(e)=> exit_with_message(format!("Failed to execute {}. Error: {}", command, e))
+                };
             }
-            let mut arg_iter = out_args.iter();
-            if let Err(e) = Command::new(arg_iter.next().unwrap()).args(arg_iter).spawn() {
-                exit_with_message(format!("Failed to execute {}. Error: {}", value, e));
-            };
         }
         None => exit_invalid_key(key)
     }
