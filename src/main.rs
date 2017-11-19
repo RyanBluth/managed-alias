@@ -31,8 +31,7 @@ impl GenericError {
 }
 
 impl<T> From<T> for GenericError
-    where
-        T: Display,
+    where T: Display
 {
     fn from(x: T) -> Self {
         return GenericError::new(format!("{}", x));
@@ -133,7 +132,7 @@ fn main() {
     } else if let Some(sub_matches) = matches.subcommand_matches(DELETE) {
         match sub_matches.value_of(KEY) {
             Some(key) => delete(key),
-            None => exit_with_message("Delete requires a variable key")
+            None => exit_with_message("Delete requires a variable key"),
         }
     } else if let Some(key) = matches.value_of(KEY) {
         let value = lookup(key);
@@ -142,7 +141,7 @@ fn main() {
             let metadata = metadata(value);
             match metadata {
                 Ok(_) => go(key),
-                Err(_) => run(key, matches.values_of_lossy(RUN_ARGS))
+                Err(_) => run(key, matches.values_of_lossy(RUN_ARGS)),
             }
         } else {
             exit_with_message(format!("Invalid key {}", key))
@@ -168,12 +167,12 @@ fn list() {
 fn run(key: &str, args: Option<Vec<String>>) {
     match lookup(key) {
         Some(value) => {
-            for command in value.split("&"){
-                let mut out_args:Vec<String> = command
+            for command in value.split("&") {
+                let mut out_args: Vec<String> = command
                     .split_whitespace()
-                    .map(|s|String::from(s))
+                    .map(|s| String::from(s))
                     .collect::<Vec<String>>();
-                if let Some(arg_vec) = args.clone(){
+                if let Some(arg_vec) = args.clone() {
                     let mut joined_args = String::new();
                     for arg in &arg_vec {
                         joined_args.push_str(arg.clone().as_str());
@@ -181,7 +180,7 @@ fn run(key: &str, args: Option<Vec<String>>) {
                     }
                     joined_args.pop();
 
-                    for arg in out_args.clone().iter().enumerate(){
+                    for arg in out_args.clone().iter().enumerate() {
                         let mut current = arg.1.clone();
                         for i in 0..arg_vec.len() {
                             let token = format!("${}", i);
@@ -193,19 +192,23 @@ fn run(key: &str, args: Option<Vec<String>>) {
                 }
                 let mut arg_iter = out_args.iter();
                 match Command::new(arg_iter.next().unwrap())
-                            .args(arg_iter)
-                            .stdout(Stdio::inherit())
-                            .spawn(){
+                          .args(arg_iter)
+                          .stdout(Stdio::inherit())
+                          .spawn() {
                     Ok(mut child) => {
-                        if let Err(e) = child.wait(){
-                            exit_with_message(format!("Failed to wait for command {}. Error: {}", command, e));
+                        if let Err(e) = child.wait() {
+                            exit_with_message(format!("Failed to wait for command {}. Error: {}",
+                                                      command,
+                                                      e));
                         }
-                    },
-                    Err(e)=> exit_with_message(format!("Failed to execute {}. Error: {}", command, e))
+                    }
+                    Err(e) => {
+                        exit_with_message(format!("Failed to execute {}. Error: {}", command, e))
+                    }
                 };
             }
         }
-        None => exit_invalid_key(key)
+        None => exit_invalid_key(key),
     }
 }
 
@@ -235,11 +238,9 @@ fn delete(key: &str) {
 
 fn lookup(key: &str) -> Option<String> {
     let entries = get_entries();
-    match entries.get(&String::from(key)){
+    match entries.get(&String::from(key)) {
         None => None,
-        Some(entry) => {
-            Some(entry.clone())
-        },
+        Some(entry) => Some(entry.clone()),
     }
 }
 
@@ -264,7 +265,7 @@ fn get_file_dir() -> String {
 }
 
 fn get_entries() -> HashMap<String, String> {
-    let mut result:HashMap<String, String> = HashMap::new();
+    let mut result: HashMap<String, String> = HashMap::new();
     let contents = get_file_contents();
     let lines = contents.split('\n');
     for line in lines {
@@ -284,27 +285,23 @@ fn write_entries(entries: HashMap<String, String>) {
         out.push_str(format_entry(&entry.0, &entry.1).as_str());
     }
     let mut file = match OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .read(true)
-        .open(get_file_dir())
-        {
-            Ok(file) => file,
-            Err(e) => {
-                exit_with_message(format!("Failed to create file {}. Error: {}", STORE_FILE, e));
-                return;
-            }
-        };
+              .write(true)
+              .create(true)
+              .truncate(true)
+              .read(true)
+              .open(get_file_dir()) {
+        Ok(file) => file,
+        Err(e) => {
+            exit_with_message(format!("Failed to create file {}. Error: {}", STORE_FILE, e));
+            return;
+        }
+    };
     if let Err(e) = file.write_all(out.as_bytes()) {
-        exit_with_message(format!(
-            "Failed to write value to {}. Error: {}",
-            STORE_FILE, e
-        ));
+        exit_with_message(format!("Failed to write value to {}. Error: {}", STORE_FILE, e));
     };
 }
 
-fn format_entry(key:&String, val:&String) -> String {
+fn format_entry(key: &String, val: &String) -> String {
     return format!("{}\":\"{}\n", key, val);
 }
 
@@ -313,8 +310,7 @@ fn exit_invalid_key(key: &str) {
 }
 
 fn exit_with_message<T>(message: T)
-    where
-        T: Display,
+    where T: Display
 {
     println!("{}", message);
     process::exit(1);
