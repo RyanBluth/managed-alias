@@ -152,16 +152,58 @@ fn main() {
 fn list() {
     let entries = get_entries();
     let mut longest_key = 0;
+    let mut longest_total = 0;
 
     for entry in &entries {
         if entry.0.len() > longest_key {
             longest_key = entry.0.len();
         }
+        let len_combined = format!("| {} = {} |", entry.0, entry.1).len();
+        if len_combined > longest_total {
+            longest_total = len_combined;
+        }
     }
-    for entry in entries {
-        let padding = str::repeat(" ", longest_key - entry.0.len());
-        println!("{}{} = {}", padding, entry.0, entry.1);
+
+    let mut commands = vec![];
+    let mut paths = vec![];
+
+    for entry in entries.iter().collect::<Vec<(&String, &String)>>() {
+        let metadata = metadata(entry.1);
+        match metadata {
+            Ok(_) => paths.push(entry.clone()),
+            Err(_) => commands.push(entry.clone()),
+        }
     }
+
+    commands.sort_by(|a, b| a.0.cmp(b.0));
+    paths.sort_by(|a, b| a.0.cmp(b.0));
+
+    print_header(longest_total, "Paths");
+
+    for entry in paths {
+        print_key_val(longest_total, longest_key, entry.0, entry.1);
+    }
+
+    print_header(longest_total, "Commands");
+
+    for entry in commands {
+        print_key_val(longest_total, longest_key, entry.0, entry.1);
+    }
+}
+
+fn print_header(max_len: usize, val: &str) {
+    let sep = str::repeat("-", max_len);
+    let padding = str::repeat(" ", max_len - val.len() - 4);
+    println!("{}", sep);
+    println!("| {}{} |", val, padding);
+    println!("{}", sep);
+}
+
+fn print_key_val(max_len: usize, max_key_len: usize, key: &String, val: &String) {
+    let padding_start = str::repeat(" ", max_key_len - key.len());
+    let padding_end = str::repeat(" ",
+                                  max_len - padding_start.len() - key.len() - val.len() - 7);
+    println!("| {}{} = {}{} |", padding_start, key, val, padding_end);
 }
 
 fn run(key: &str, args: Option<Vec<String>>) {
