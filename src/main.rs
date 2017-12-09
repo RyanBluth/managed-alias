@@ -3,11 +3,12 @@ extern crate clap;
 use clap::{App, AppSettings, Arg, SubCommand};
 
 use std::process;
-use std::fmt::Display;
+use std::fmt::{Display, Result, Formatter};
 use std::fs::{File, OpenOptions, metadata};
 use std::io::prelude::*;
 use std::process::{Command, Stdio};
 use std::collections::HashMap;
+use std::cmp::max;
 
 const GO: &'static str = "go";
 const SET: &'static str = "set";
@@ -149,46 +150,177 @@ fn main() {
     }
 }
 
+struct ColumnEntry<'data> {
+    data: Box<&'data Display>,
+    col_span: usize
+}
+
+impl<'data> ColumnEntry<'data> {
+    fn new(data: &'data Display, col_span:usize) -> ColumnEntry<'data> {
+        return ColumnEntry { data: Box::new(data), col_span };
+    }
+
+    fn width(&self) -> usize {
+        return format!("{}", self).len();
+    }
+}
+
+impl<'data, T> From<&'data T> for ColumnEntry<'data> where T: Display{
+
+    fn from(x: &'data T) -> Self {
+        return ColumnEntry::new(&format!("{}", x), 1);
+    }
+}
+
+impl<'data> Display for ColumnEntry<'data> {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, " {} ", self.data)
+    }
+}
+
+struct Row<'data> {
+    columns: Vec<ColumnEntry<'data>>,
+}
+
+impl<'data> Row<'data> {
+    fn new(column_entries: Vec<ColumnEntry>) -> Row {
+        let mut row = Row { columns: vec![] };
+
+        for entry in column_entries {
+            row.columns.push(entry);
+        }
+
+        return row;
+    }
+
+    fn column_widths(&self) -> Vec<usize> {
+        let mut widths = Vec::new();
+        for column in &self.columns {
+            widths.push(column.width());
+        }
+        return widths;
+    }
+}
+
+struct Table<'data> {
+    column_titles: Vec<String>,
+    rows: Vec<Row<'data>>,
+}
+
+impl<'data> Table<'data> {
+    fn new() -> Table<'data> {
+        return Table {
+                   column_titles: Vec::new(),
+                   rows: Vec::new(),
+               };
+    }
+
+    fn add_row(&mut self, column_values: Vec<ColumnEntry<'data>>) {
+        self.rows.push(Row::new(column_values));
+    }
+
+    fn print(&mut self) {
+        let mut print_buffer = String::new();
+        let max_widths = self.calculate_max_column_widths();
+        let total_width = max_widths.iter().sum::<usize>() + 4;
+        let separator = Table::gen_separator(&max_widths);
+        Table::buffer_line(&mut print_buffer, &separator);
+        for row in &self.rows {
+            Table::buffer_line(&mut print_buffer, &self.format_row(&row, &max_widths));
+        }
+        Table::buffer_line(&mut print_buffer, &separator);
+        println!("{}", print_buffer);
+    }
+
+    fn format_row(&self, row: &Row<'data>, max_widths: &Vec<usize>) -> String {
+        let mut buf = String::new();
+        for en in max_widths.into_iter().enumerate() {
+            if row.columns.len() > en.0 {
+                let pad_len = en.1 - row.columns[en.0].width();
+                if 0 == 1 {
+                    let pad_front_len = f32::ceil(pad_len as f32 / 2f32) as usize;
+                    let pad_front = str::repeat(" ", pad_front_len);
+                    let pad_end_len = pad_len - pad_front_len;
+                    let pad_end = str::repeat(" ", pad_end_len);
+                    buf.push_str(format!("|{}{}{}", pad_front, row.columns[en.0], pad_end)
+                                     .as_str());
+                } else {
+                    buf.push_str(format!("|{}{}", row.columns[en.0], str::repeat(" ", pad_len))
+                                     .as_str());
+                }
+            } else {
+                buf.push_str(format!("| {}", str::repeat(" ", *en.1 - 1)).as_str());
+            }
+        }
+        buf.push_str(" |");
+        return buf;
+    }
+
+    fn gen_separator(max_widths: &Vec<usize>) -> String {
+        let mut buf = String::new();
+        buf.push('+');
+        for width in max_widths {
+            if buf.len() > 1 {
+                buf.push('+');
+            }
+            buf.push_str(str::repeat("-", *width).as_str());
+        }
+        buf.push('+');
+        return buf;
+    }
+
+    fn calculate_max_column_widths(&self) -> Vec<usize> {
+        let mut max_widths: Vec<usize> = Vec::new();
+        for row in &self.rows {
+            for i in 0..row.columns.len() {
+                if max_widths.len() <= i {
+                    max_widths.push(row.columns[i].width());
+                } else {
+                    max_widths[i] = max(max_widths[i], row.columns[i].width());
+                }
+            }
+        }
+        return max_widths;
+    }
+
+    fn buffer_line(buffer: &mut String, line: &String) {
+        buffer.push_str(format!("{}\n", line).as_str());
+    }
+}
+
 fn list() {
     let entries = get_entries();
     let mut longest_key = 0;
     let mut longest_total = 0;
 
-    for entry in &entries {
-        if entry.0.len() > longest_key {
-            longest_key = entry.0.len();
-        }
-        let len_combined = format!("| {} = {} |", entry.0, entry.1).len();
-        if len_combined > longest_total {
-            longest_total = len_combined;
-        }
-    }
-
-    let mut commands = vec![];
-    let mut paths = vec![];
+    let mut commands = Vec::new();
+    let mut paths = Vec::new();
 
     for entry in entries.iter().collect::<Vec<(&String, &String)>>() {
         let metadata = metadata(entry.1);
         match metadata {
-            Ok(_) => paths.push(entry.clone()),
-            Err(_) => commands.push(entry.clone()),
+            Ok(_) => paths.push(entry),
+            Err(_) => commands.push(entry),
         }
     }
 
-    commands.sort_by(|a, b| a.0.cmp(b.0));
-    paths.sort_by(|a, b| a.0.cmp(b.0));
+    let mut table = Table::new();
+    table.add_row(vec![ColumnEntry::from(&"Paths"), ColumnEntry::from(&"Commands")]);
 
-    print_header(longest_total, "Paths");
-
-    for entry in paths {
-        print_key_val(longest_total, longest_key, entry.0, entry.1);
+    for i in 0..max(commands.len(), paths.len()) {
+        let mut vals:Vec<ColumnEntry> = Vec::new();
+        if commands.len() > i {
+            vals.push(ColumnEntry::from(commands[i].0));
+            vals.push(ColumnEntry::from(commands[i].1));
+        }
+        if paths.len() > i {
+            vals.push(ColumnEntry::from(paths[i].0));
+            vals.push(ColumnEntry::from(paths[i].1));
+        }
+        table.add_row(vals);
     }
 
-    print_header(longest_total, "Commands");
-
-    for entry in commands {
-        print_key_val(longest_total, longest_key, entry.0, entry.1);
-    }
+    table.print();
 }
 
 fn print_header(max_len: usize, val: &str) {
