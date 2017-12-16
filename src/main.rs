@@ -9,6 +9,7 @@ use std::io::prelude::*;
 use std::process::{Command, Stdio};
 use std::collections::HashMap;
 use std::cmp::max;
+use std::borrow::Cow;
 
 const GO: &'static str = "go";
 const SET: &'static str = "set";
@@ -151,13 +152,18 @@ fn main() {
 }
 
 struct ColumnEntry<'data> {
-    data: Box<&'data Display>,
-    col_span: usize
+    data: Cow<'data, str>,
+    col_span: usize,
 }
 
 impl<'data> ColumnEntry<'data> {
-    fn new(data: &'data Display, col_span:usize) -> ColumnEntry<'data> {
-        return ColumnEntry { data: Box::new(data), col_span };
+    fn new<C>(data: C, col_span: usize) -> ColumnEntry<'data>
+        where C: Into<Cow<'data, str>>
+    {
+        return ColumnEntry {
+                   data: data.into(),
+                   col_span,
+               };
     }
 
     fn width(&self) -> usize {
@@ -165,13 +171,32 @@ impl<'data> ColumnEntry<'data> {
     }
 }
 
-impl<'data, T> From<&'data T> for ColumnEntry<'data> where T: Display{
-
-    fn from(x: &'data T) -> Self {
-        return ColumnEntry::new(&format!("{}", x), 1);
+impl<'data, T> From<&'data T> for ColumnEntry<'data>
+    where T: Display
+{
+    fn from(x: &'data T) -> ColumnEntry<'data> {
+        return ColumnEntry::new(format!("{}", x), 1);
     }
 }
 
+/*
+impl<'data, T> From<Vec<T>> for ColumnEntry<'data> where T: Display{
+
+    fn from(x: &'data T) -> ColumnEntry<'data>{
+        return ColumnEntry::new(format!("{}", x), 1);
+    }
+}
+*/
+
+
+/*
+impl<'data, T> Into<ColumnEntry<'data>> for T where T: Display{
+
+    fn into(self) -> ColumnEntry<'data> {
+        return ColumnEntry::new(format!("{}", self), 1);
+    }
+}
+*/
 impl<'data> Display for ColumnEntry<'data> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, " {} ", self.data)
@@ -183,11 +208,13 @@ struct Row<'data> {
 }
 
 impl<'data> Row<'data> {
-    fn new(column_entries: Vec<ColumnEntry>) -> Row {
+    fn new<T>(column_entries: Vec<T>) -> Row<'data>
+        where T: Into<ColumnEntry<'data>>
+    {
         let mut row = Row { columns: vec![] };
 
         for entry in column_entries {
-            row.columns.push(entry);
+            row.columns.push(entry.into());
         }
 
         return row;
@@ -215,8 +242,8 @@ impl<'data> Table<'data> {
                };
     }
 
-    fn add_row(&mut self, column_values: Vec<ColumnEntry<'data>>) {
-        self.rows.push(Row::new(column_values));
+    fn add_row(&mut self, row: Row<'data>) {
+        self.rows.push(row);
     }
 
     fn print(&mut self) {
@@ -227,32 +254,48 @@ impl<'data> Table<'data> {
         Table::buffer_line(&mut print_buffer, &separator);
         for row in &self.rows {
             Table::buffer_line(&mut print_buffer, &self.format_row(&row, &max_widths));
+            Table::buffer_line(&mut print_buffer, &separator);
         }
-        Table::buffer_line(&mut print_buffer, &separator);
+        //Table::buffer_line(&mut print_buffer, &separator);
         println!("{}", print_buffer);
     }
 
     fn format_row(&self, row: &Row<'data>, max_widths: &Vec<usize>) -> String {
         let mut buf = String::new();
+        let mut span_count = 1;
+        let mut col_idx = 0;
         for en in max_widths.into_iter().enumerate() {
-            if row.columns.len() > en.0 {
-                let pad_len = en.1 - row.columns[en.0].width();
-                if 0 == 1 {
-                    let pad_front_len = f32::ceil(pad_len as f32 / 2f32) as usize;
-                    let pad_front = str::repeat(" ", pad_front_len);
-                    let pad_end_len = pad_len - pad_front_len;
-                    let pad_end = str::repeat(" ", pad_end_len);
-                    buf.push_str(format!("|{}{}{}", pad_front, row.columns[en.0], pad_end)
-                                     .as_str());
-                } else {
-                    buf.push_str(format!("|{}{}", row.columns[en.0], str::repeat(" ", pad_len))
-                                     .as_str());
+            if row.columns.len() > col_idx {
+                if span_count == 1 {
+                    let mut pad_len = 0;
+                    if *en.1 > row.columns[col_idx].width(){
+                        pad_len = en.1 - row.columns[col_idx].width();
+                    }
+                    if 0 == 1 {
+                        let pad_front_len = f32::ceil(pad_len as f32 / 2f32) as usize;
+                        let pad_front = str::repeat(" ", pad_front_len);
+                        let pad_end_len = pad_len - pad_front_len;
+                        let pad_end = str::repeat(" ", pad_end_len);
+                        buf.push_str(format!("|{}{}{}", pad_front, row.columns[col_idx], pad_end)
+                            .as_str());
+                    } else {
+                        buf.push_str(format!("|{}{}", row.columns[col_idx], str::repeat(" ", pad_len))
+                            .as_str());
+                    }
+                }else{
+                    buf.push_str(format!("{} ", str::repeat(" ", *en.1)).as_str());
+                }
+                if span_count < row.columns[col_idx].col_span {
+                    span_count += 1;
+                }else{
+                    span_count = 1;
+                    col_idx += 1;
                 }
             } else {
                 buf.push_str(format!("| {}", str::repeat(" ", *en.1 - 1)).as_str());
             }
         }
-        buf.push_str(" |");
+        buf.push_str("|");
         return buf;
     }
 
@@ -305,19 +348,17 @@ fn list() {
     }
 
     let mut table = Table::new();
-    table.add_row(vec![ColumnEntry::from(&"Paths"), ColumnEntry::from(&"Commands")]);
 
-    for i in 0..max(commands.len(), paths.len()) {
-        let mut vals:Vec<ColumnEntry> = Vec::new();
-        if commands.len() > i {
-            vals.push(ColumnEntry::from(commands[i].0));
-            vals.push(ColumnEntry::from(commands[i].1));
-        }
-        if paths.len() > i {
-            vals.push(ColumnEntry::from(paths[i].0));
-            vals.push(ColumnEntry::from(paths[i].1));
-        }
-        table.add_row(vals);
+    table.add_row(Row::new(vec![ColumnEntry::new("COMMANDS", 2)]));
+
+    for command in commands {
+        table.add_row(Row::new(vec![command.0, command.1]));
+    }
+
+    table.add_row(Row::new(vec![ColumnEntry::new("PATHS", 2)]));
+
+    for path in paths {
+        table.add_row(Row::new(vec![path.0, path.1]));
     }
 
     table.print();
