@@ -1,12 +1,12 @@
-use table::cell::ColumnEntry;
+use table::cell::Cell;
 
 pub struct Row<'data> {
-    pub columns: Vec<ColumnEntry<'data>>,
+    pub columns: Vec<Cell<'data>>,
 }
 
 impl<'data> Row<'data> {
     pub fn new<T>(cells: Vec<T>) -> Row<'data>
-        where T: Into<ColumnEntry<'data>>
+        where T: Into<Cell<'data>>
     {
         let mut row = Row { columns: vec![] };
 

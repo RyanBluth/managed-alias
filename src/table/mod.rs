@@ -1,7 +1,7 @@
 pub mod row;
 pub mod cell;
 
-use table::cell::ColumnEntry;
+use table::cell::Cell;
 use table::row::Row;
 
 use std::cmp::max;

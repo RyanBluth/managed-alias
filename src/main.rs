@@ -15,7 +15,7 @@ use std::borrow::Cow;
 
 use table::row::Row;
 use table::Table;
-use table::cell::ColumnEntry;
+use table::cell::Cell;
 
 const GO: &'static str = "go";
 const SET: &'static str = "set";
@@ -175,7 +175,7 @@ fn list() {
 
     let mut table = Table::new();
 
-    table.add_row(Row::new(vec![ColumnEntry::new("COMMANDS", 2)]));
+    table.add_row(Row::new(vec![Cell::new("COMMANDS", 2)]));
 
     for command in commands {
         table.add_row(Row::new(vec![command.0, command.1]));
@@ -187,7 +187,7 @@ fn list() {
 
     table = Table::new();
 
-    table.add_row(Row::new(vec![ColumnEntry::new("PATHS", 2)]));
+    table.add_row(Row::new(vec![Cell::new("PATHS", 2)]));
 
     for path in paths {
         table.add_row(Row::new(vec![path.0, path.1]));
