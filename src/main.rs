@@ -1,5 +1,7 @@
 extern crate clap;
 
+mod table;
+
 use clap::{App, AppSettings, Arg, SubCommand};
 
 use std::process;
@@ -10,6 +12,10 @@ use std::process::{Command, Stdio};
 use std::collections::HashMap;
 use std::cmp::max;
 use std::borrow::Cow;
+
+use table::row::Row;
+use table::Table;
+use table::cell::ColumnEntry;
 
 const GO: &'static str = "go";
 const SET: &'static str = "set";
@@ -151,186 +157,6 @@ fn main() {
     }
 }
 
-struct ColumnEntry<'data> {
-    data: Cow<'data, str>,
-    col_span: usize,
-}
-
-impl<'data> ColumnEntry<'data> {
-    fn new<C>(data: C, col_span: usize) -> ColumnEntry<'data>
-        where C: Into<Cow<'data, str>>
-    {
-        return ColumnEntry {
-                   data: data.into(),
-                   col_span,
-               };
-    }
-
-    fn width(&self) -> usize {
-        return format!("{}", self).len();
-    }
-}
-
-impl<'data, T> From<&'data T> for ColumnEntry<'data>
-    where T: Display
-{
-    fn from(x: &'data T) -> ColumnEntry<'data> {
-        return ColumnEntry::new(format!("{}", x), 1);
-    }
-}
-
-/*
-impl<'data, T> From<Vec<T>> for ColumnEntry<'data> where T: Display{
-
-    fn from(x: &'data T) -> ColumnEntry<'data>{
-        return ColumnEntry::new(format!("{}", x), 1);
-    }
-}
-*/
-
-
-/*
-impl<'data, T> Into<ColumnEntry<'data>> for T where T: Display{
-
-    fn into(self) -> ColumnEntry<'data> {
-        return ColumnEntry::new(format!("{}", self), 1);
-    }
-}
-*/
-impl<'data> Display for ColumnEntry<'data> {
-    fn fmt(&self, f: &mut Formatter) -> Result {
-        write!(f, " {} ", self.data)
-    }
-}
-
-struct Row<'data> {
-    columns: Vec<ColumnEntry<'data>>,
-}
-
-impl<'data> Row<'data> {
-    fn new<T>(column_entries: Vec<T>) -> Row<'data>
-        where T: Into<ColumnEntry<'data>>
-    {
-        let mut row = Row { columns: vec![] };
-
-        for entry in column_entries {
-            row.columns.push(entry.into());
-        }
-
-        return row;
-    }
-
-    fn column_widths(&self) -> Vec<usize> {
-        let mut widths = Vec::new();
-        for column in &self.columns {
-            widths.push(column.width());
-        }
-        return widths;
-    }
-}
-
-struct Table<'data> {
-    column_titles: Vec<String>,
-    rows: Vec<Row<'data>>,
-}
-
-impl<'data> Table<'data> {
-    fn new() -> Table<'data> {
-        return Table {
-                   column_titles: Vec::new(),
-                   rows: Vec::new(),
-               };
-    }
-
-    fn add_row(&mut self, row: Row<'data>) {
-        self.rows.push(row);
-    }
-
-    fn print(&mut self) {
-        let mut print_buffer = String::new();
-        let max_widths = self.calculate_max_column_widths();
-        let total_width = max_widths.iter().sum::<usize>() + 4;
-        let separator = Table::gen_separator(&max_widths);
-        Table::buffer_line(&mut print_buffer, &separator);
-        for row in &self.rows {
-            Table::buffer_line(&mut print_buffer, &self.format_row(&row, &max_widths));
-            Table::buffer_line(&mut print_buffer, &separator);
-        }
-        //Table::buffer_line(&mut print_buffer, &separator);
-        println!("{}", print_buffer);
-    }
-
-    fn format_row(&self, row: &Row<'data>, max_widths: &Vec<usize>) -> String {
-        let mut buf = String::new();
-        let mut span_count = 1;
-        let mut col_idx = 0;
-        for en in max_widths.into_iter().enumerate() {
-            if row.columns.len() > col_idx {
-                if span_count == 1 {
-                    let mut pad_len = 0;
-                    if *en.1 > row.columns[col_idx].width(){
-                        pad_len = en.1 - row.columns[col_idx].width();
-                    }
-                    if 0 == 1 {
-                        let pad_front_len = f32::ceil(pad_len as f32 / 2f32) as usize;
-                        let pad_front = str::repeat(" ", pad_front_len);
-                        let pad_end_len = pad_len - pad_front_len;
-                        let pad_end = str::repeat(" ", pad_end_len);
-                        buf.push_str(format!("|{}{}{}", pad_front, row.columns[col_idx], pad_end)
-                            .as_str());
-                    } else {
-                        buf.push_str(format!("|{}{}", row.columns[col_idx], str::repeat(" ", pad_len))
-                            .as_str());
-                    }
-                }else{
-                    buf.push_str(format!("{} ", str::repeat(" ", *en.1)).as_str());
-                }
-                if span_count < row.columns[col_idx].col_span {
-                    span_count += 1;
-                }else{
-                    span_count = 1;
-                    col_idx += 1;
-                }
-            } else {
-                buf.push_str(format!("| {}", str::repeat(" ", *en.1 - 1)).as_str());
-            }
-        }
-        buf.push_str("|");
-        return buf;
-    }
-
-    fn gen_separator(max_widths: &Vec<usize>) -> String {
-        let mut buf = String::new();
-        buf.push('+');
-        for width in max_widths {
-            if buf.len() > 1 {
-                buf.push('+');
-            }
-            buf.push_str(str::repeat("-", *width).as_str());
-        }
-        buf.push('+');
-        return buf;
-    }
-
-    fn calculate_max_column_widths(&self) -> Vec<usize> {
-        let mut max_widths: Vec<usize> = Vec::new();
-        for row in &self.rows {
-            for i in 0..row.columns.len() {
-                if max_widths.len() <= i {
-                    max_widths.push(row.columns[i].width());
-                } else {
-                    max_widths[i] = max(max_widths[i], row.columns[i].width());
-                }
-            }
-        }
-        return max_widths;
-    }
-
-    fn buffer_line(buffer: &mut String, line: &String) {
-        buffer.push_str(format!("{}\n", line).as_str());
-    }
-}
-
 fn list() {
     let entries = get_entries();
     let mut longest_key = 0;
@@ -354,6 +180,12 @@ fn list() {
     for command in commands {
         table.add_row(Row::new(vec![command.0, command.1]));
     }
+
+    table.print();
+
+    println!(" ");
+
+    table = Table::new();
 
     table.add_row(Row::new(vec![ColumnEntry::new("PATHS", 2)]));
 
