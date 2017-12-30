@@ -1,0 +1,6 @@
+language: rust
+rust:
+  - nighly
+script:
+  - cargo build --verbose --all
+  - cargo test --verbose --all
