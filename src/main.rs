@@ -149,12 +149,12 @@ fn main() {
             let metadata = metadata(value);
             match metadata {
                 Ok(metadata) => {
-                    if metadata.is_dir(){
+                    if metadata.is_dir() {
                         go(key);
-                    }else{
+                    } else {
                         run(key, matches.values_of_lossy(RUN_ARGS));
                     }
-                },
+                }
                 Err(_) => run(key, matches.values_of_lossy(RUN_ARGS)),
             }
         } else {
@@ -200,14 +200,6 @@ fn list() {
     }
 
     table.print();
-}
-
-fn print_header(max_len: usize, val: &str) {
-    let sep = str::repeat("-", max_len);
-    let padding = str::repeat(" ", max_len - val.len() - 4);
-    println!("{}", sep);
-    println!("| {}{} |", val, padding);
-    println!("{}", sep);
 }
 
 fn print_key_val(max_len: usize, max_key_len: usize, key: &String, val: &String) {

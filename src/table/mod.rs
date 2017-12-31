@@ -7,7 +7,7 @@ use table::row::Row;
 use std::cmp::max;
 
 #[derive(Eq, PartialEq)]
-enum RowPosition{
+enum RowPosition {
     First,
     Mid,
     Last,
@@ -59,6 +59,30 @@ impl TableStyle {
                    horizontal: '═',
                };
     }
+
+    pub fn start_for_position(&self, pos: &RowPosition) -> char {
+        match *pos {
+            RowPosition::First => self.top_left_corner,
+            RowPosition::Mid => self.outer_left_vertical,
+            RowPosition::Last => self.bottom_left_corner,
+        }
+    }
+
+    pub fn end_for_position(&self, pos: &RowPosition) -> char {
+        match *pos {
+            RowPosition::First => self.top_right_corner,
+            RowPosition::Mid => self.outer_right_vertical,
+            RowPosition::Last => self.bottom_right_corner,
+        }
+    }
+
+    pub fn intersect_for_position(&self, pos: &RowPosition) -> char {
+        match *pos {
+            RowPosition::First => self.outer_top_horizontal,
+            RowPosition::Mid => self.intersection,
+            RowPosition::Last => self.outer_bottom_horizontal,
+        }
+    }
 }
 
 
@@ -85,12 +109,12 @@ impl<'data> Table<'data> {
         let mut buf = String::new();
         let mut span_count = 1;
         let mut col_idx = 0;
-        for en in max_widths.into_iter().enumerate() {
+        for width in max_widths.into_iter() {
             if row.cells.len() > col_idx {
                 if span_count == 1 {
                     let mut pad_len = 0;
-                    if *en.1 > row.cells[col_idx].width() {
-                        pad_len = en.1 - row.cells[col_idx].width();
+                    if *width > row.cells[col_idx].width() {
+                        pad_len = width - row.cells[col_idx].width();
                     }
 
                     buf.push_str(format!("{}{}{}",
@@ -99,7 +123,7 @@ impl<'data> Table<'data> {
                                          str::repeat(" ", pad_len))
                                          .as_str());
                 } else {
-                    buf.push_str(format!("{} ", str::repeat(" ", *en.1)).as_str());
+                    buf.push_str(format!("{} ", str::repeat(" ", *width)).as_str());
                 }
                 if span_count < row.cells[col_idx].col_span {
                     span_count += 1;
@@ -108,7 +132,7 @@ impl<'data> Table<'data> {
                     col_idx += 1;
                 }
             } else {
-                buf.push_str(format!("{} {}", self.style.vertical, str::repeat(" ", *en.1 - 1))
+                buf.push_str(format!("{} {}", self.style.vertical, str::repeat(" ", *width - 1))
                                  .as_str());
             }
         }
@@ -121,16 +145,20 @@ impl<'data> Table<'data> {
         let max_widths = self.calculate_max_column_widths();
         let total_width = max_widths.iter().sum::<usize>() + 4;
         if self.rows.len() > 0 {
-            for i in 0..self.rows.len(){
+            for i in 0..self.rows.len() {
                 let mut row_pos = RowPosition::Mid;
-                if i == 0{
+                if i == 0 {
                     row_pos = RowPosition::First;
                 }
                 let separator = self.rows[i].get_separator(&max_widths, &self.style, row_pos);
                 Table::buffer_line(&mut print_buffer, &separator);
-                Table::buffer_line(&mut print_buffer, &self.format_row(&self.rows[i], &max_widths));
+                Table::buffer_line(&mut print_buffer,
+                                   &self.format_row(&self.rows[i], &max_widths));
             }
-            let separator = self.rows.last().unwrap().get_separator(&max_widths, &self.style, RowPosition::Last);
+            let separator = self.rows
+                .last()
+                .unwrap()
+                .get_separator(&max_widths, &self.style, RowPosition::Last);
             Table::buffer_line(&mut print_buffer, &separator);
             println!("{}", print_buffer);
         }
