@@ -31,12 +31,13 @@ impl<'data> Row<'data> {
         let mut span_count = 0;
         buf.push(style.outer_left_vertical);
         for i in 0..max_widths.len() {
-            if buf.len() > 1 && span_count == self.cells[i - span_count].col_span{
+            if buf.len() > 1 && span_count == self.cells[i - span_count].col_span {
                 buf.push(style.intersection);
-            }else if span_count > 0{
+            } else if span_count > 0 {
                 buf.push(style.horizontal);
             }
-            buf.push_str(str::repeat(style.horizontal.to_string().as_str(), max_widths[i]).as_str());
+            buf.push_str(str::repeat(style.horizontal.to_string().as_str(), max_widths[i])
+                             .as_str());
             span_count += 1;
         }
         buf.push(style.outer_right_vertical);

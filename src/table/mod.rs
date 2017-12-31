@@ -6,7 +6,7 @@ use table::row::Row;
 
 use std::cmp::max;
 
-pub struct TableStyle{
+pub struct TableStyle {
     pub top_left_corner: char,
     pub top_right_corner: char,
     pub bottom_left_corner: char,
@@ -17,41 +17,40 @@ pub struct TableStyle{
     pub outer_top_horizontal: char,
     pub intersection: char,
     pub vertical: char,
-    pub horizontal: char
+    pub horizontal: char,
 }
 
-impl TableStyle{
-
-    pub fn simple() -> TableStyle{
-        return TableStyle{
-            top_left_corner: '+',
-            top_right_corner: '+',
-            bottom_left_corner: '+',
-            bottom_right_corner: '+',
-            outer_left_vertical: '+',
-            outer_right_vertical: '+',
-            outer_bottom_horizontal: '-',
-            outer_top_horizontal: '-',
-            intersection: '+',
-            vertical: '|',
-            horizontal: '-'
-        }
+impl TableStyle {
+    pub fn simple() -> TableStyle {
+        return TableStyle {
+                   top_left_corner: '+',
+                   top_right_corner: '+',
+                   bottom_left_corner: '+',
+                   bottom_right_corner: '+',
+                   outer_left_vertical: '+',
+                   outer_right_vertical: '+',
+                   outer_bottom_horizontal: '-',
+                   outer_top_horizontal: '-',
+                   intersection: '+',
+                   vertical: '|',
+                   horizontal: '-',
+               };
     }
 
-    pub fn extended() -> TableStyle{
-        return TableStyle{
-            top_left_corner: '╔',
-            top_right_corner: '╗',
-            bottom_left_corner: '╚',
-            bottom_right_corner: '╝',
-            outer_left_vertical: '╠',
-            outer_right_vertical: '╣',
-            outer_bottom_horizontal: '╩',
-            outer_top_horizontal: '╦',
-            intersection: '╬',
-            vertical:'║',
-            horizontal:'═'
-        }
+    pub fn extended() -> TableStyle {
+        return TableStyle {
+                   top_left_corner: '╔',
+                   top_right_corner: '╗',
+                   bottom_left_corner: '╚',
+                   bottom_right_corner: '╝',
+                   outer_left_vertical: '╠',
+                   outer_right_vertical: '╣',
+                   outer_bottom_horizontal: '╩',
+                   outer_top_horizontal: '╦',
+                   intersection: '╬',
+                   vertical: '║',
+                   horizontal: '═',
+               };
     }
 }
 
@@ -59,16 +58,16 @@ impl TableStyle{
 pub struct Table<'data> {
     pub column_titles: Vec<String>,
     pub rows: Vec<Row<'data>>,
-    pub style:TableStyle,
+    pub style: TableStyle,
 }
 
 impl<'data> Table<'data> {
     pub fn new() -> Table<'data> {
         return Table {
-            column_titles: Vec::new(),
-            rows: Vec::new(),
-            style: TableStyle::extended()
-        };
+                   column_titles: Vec::new(),
+                   rows: Vec::new(),
+                   style: TableStyle::extended(),
+               };
     }
 
     pub fn add_row(&mut self, row: Row<'data>) {
@@ -83,31 +82,27 @@ impl<'data> Table<'data> {
             if row.cells.len() > col_idx {
                 if span_count == 1 {
                     let mut pad_len = 0;
-                    if *en.1 > row.cells[col_idx].width(){
+                    if *en.1 > row.cells[col_idx].width() {
                         pad_len = en.1 - row.cells[col_idx].width();
                     }
-                    if 0 == 1 {
-                        let pad_front_len = f32::ceil(pad_len as f32 / 2f32) as usize;
-                        let pad_front = str::repeat(" ", pad_front_len);
-                        let pad_end_len = pad_len - pad_front_len;
-                        let pad_end = str::repeat(" ", pad_end_len);
-                        buf.push_str(format!("{}{}{}{}", self.style.vertical, pad_front, row.cells[col_idx], pad_end)
-                            .as_str());
-                    } else {
-                        buf.push_str(format!("{}{}{}", self.style.vertical, row.cells[col_idx], str::repeat(" ", pad_len))
-                            .as_str());
-                    }
-                }else{
+
+                    buf.push_str(format!("{}{}{}",
+                                         self.style.vertical,
+                                         row.cells[col_idx],
+                                         str::repeat(" ", pad_len))
+                                         .as_str());
+                } else {
                     buf.push_str(format!("{} ", str::repeat(" ", *en.1)).as_str());
                 }
                 if span_count < row.cells[col_idx].col_span {
                     span_count += 1;
-                }else{
+                } else {
                     span_count = 1;
                     col_idx += 1;
                 }
             } else {
-                buf.push_str(format!("{} {}", self.style.vertical, str::repeat(" ", *en.1 - 1)).as_str());
+                buf.push_str(format!("{} {}", self.style.vertical, str::repeat(" ", *en.1 - 1))
+                                 .as_str());
             }
         }
         buf.push(self.style.vertical);

@@ -11,9 +11,9 @@ impl<'data> Cell<'data> {
         where C: Into<Cow<'data, str>>
     {
         return Cell {
-            data: data.into(),
-            col_span,
-        };
+                   data: data.into(),
+                   col_span,
+               };
     }
 
     pub fn width(&self) -> usize {
