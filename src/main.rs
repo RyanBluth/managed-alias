@@ -148,7 +148,13 @@ fn main() {
         if let Some(value) = value {
             let metadata = metadata(value);
             match metadata {
-                Ok(_) => go(key),
+                Ok(metadata) => {
+                    if metadata.is_dir(){
+                        go(key);
+                    }else{
+                        run(key, matches.values_of_lossy(RUN_ARGS));
+                    }
+                },
                 Err(_) => run(key, matches.values_of_lossy(RUN_ARGS)),
             }
         } else {
