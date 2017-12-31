@@ -6,6 +6,13 @@ use table::row::Row;
 
 use std::cmp::max;
 
+#[derive(Eq, PartialEq)]
+enum RowPosition{
+    First,
+    Mid,
+    Last,
+}
+
 pub struct TableStyle {
     pub top_left_corner: char,
     pub top_right_corner: char,
@@ -114,12 +121,16 @@ impl<'data> Table<'data> {
         let max_widths = self.calculate_max_column_widths();
         let total_width = max_widths.iter().sum::<usize>() + 4;
         if self.rows.len() > 0 {
-            let mut separator = String::new();
-            for row in &self.rows {
-                separator = row.get_separator(&max_widths, &self.style);
+            for i in 0..self.rows.len(){
+                let mut row_pos = RowPosition::Mid;
+                if i == 0{
+                    row_pos = RowPosition::First;
+                }
+                let separator = self.rows[i].get_separator(&max_widths, &self.style, row_pos);
                 Table::buffer_line(&mut print_buffer, &separator);
-                Table::buffer_line(&mut print_buffer, &self.format_row(&row, &max_widths));
+                Table::buffer_line(&mut print_buffer, &self.format_row(&self.rows[i], &max_widths));
             }
+            let separator = self.rows.last().unwrap().get_separator(&max_widths, &self.style, RowPosition::Last);
             Table::buffer_line(&mut print_buffer, &separator);
             println!("{}", print_buffer);
         }
