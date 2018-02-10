@@ -6,7 +6,7 @@ use table::row::Row;
 
 use std::cmp::max;
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Copy, Clone)]
 enum RowPosition {
     First,
     Mid,
@@ -60,27 +60,43 @@ impl TableStyle {
                };
     }
 
-    pub fn start_for_position(&self, pos: &RowPosition) -> char {
-        match *pos {
+    pub fn start_for_position(&self, pos: RowPosition) -> char {
+        match pos {
             RowPosition::First => self.top_left_corner,
             RowPosition::Mid => self.outer_left_vertical,
             RowPosition::Last => self.bottom_left_corner,
         }
     }
 
-    pub fn end_for_position(&self, pos: &RowPosition) -> char {
-        match *pos {
+    pub fn end_for_position(&self, pos: RowPosition) -> char {
+        match pos {
             RowPosition::First => self.top_right_corner,
             RowPosition::Mid => self.outer_right_vertical,
             RowPosition::Last => self.bottom_right_corner,
         }
     }
 
-    pub fn intersect_for_position(&self, pos: &RowPosition) -> char {
-        match *pos {
+    pub fn intersect_for_position(&self, pos: RowPosition) -> char {
+        match pos {
             RowPosition::First => self.outer_top_horizontal,
             RowPosition::Mid => self.intersection,
             RowPosition::Last => self.outer_bottom_horizontal,
+        }
+    }
+
+    pub fn merge_intersection_for_position(&self,
+                                           top: char,
+                                           bottom: char,
+                                           pos: RowPosition)
+                                           -> char {
+        if (top == self.horizontal || top == self.outer_bottom_horizontal) &&
+           bottom == self.intersection {
+            return self.outer_top_horizontal;
+        } else if(top == self.intersection || top == self.outer_top_horizontal) &&
+                  bottom == self.horizontal {
+            return self.outer_bottom_horizontal;
+        } else {
+            return self.intersect_for_position(pos);
         }
     }
 }
@@ -132,7 +148,7 @@ impl<'data> Table<'data> {
                     col_idx += 1;
                 }
             } else {
-                buf.push_str(format!("{} {}", self.style.vertical, str::repeat(" ", *width - 1))
+                buf.push_str(format!("{}{}", self.style.vertical, str::repeat(" ", *width))
                                  .as_str());
             }
         }
@@ -144,21 +160,30 @@ impl<'data> Table<'data> {
         let mut print_buffer = String::new();
         let max_widths = self.calculate_max_column_widths();
         let total_width = max_widths.iter().sum::<usize>() + 4;
+        let mut previous_separator = None;
         if self.rows.len() > 0 {
             for i in 0..self.rows.len() {
                 let mut row_pos = RowPosition::Mid;
                 if i == 0 {
                     row_pos = RowPosition::First;
                 }
-                let separator = self.rows[i].get_separator(&max_widths, &self.style, row_pos);
+                let separator =
+                    self.rows[i].get_separator(&max_widths,
+                                               &self.style,
+                                               row_pos,
+                                               previous_separator.clone());
                 Table::buffer_line(&mut print_buffer, &separator);
                 Table::buffer_line(&mut print_buffer,
                                    &self.format_row(&self.rows[i], &max_widths));
+                previous_separator = Some(separator.clone());
             }
             let separator = self.rows
                 .last()
                 .unwrap()
-                .get_separator(&max_widths, &self.style, RowPosition::Last);
+                .get_separator(&max_widths,
+                               &self.style,
+                               RowPosition::Last,
+                               None);
             Table::buffer_line(&mut print_buffer, &separator);
             println!("{}", print_buffer);
         }
