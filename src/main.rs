@@ -5,14 +5,11 @@ mod table;
 use clap::{App, AppSettings, Arg, SubCommand};
 
 use std::process;
-use std::fmt::{Display, Result, Formatter};
+use std::fmt::{Display};
 use std::fs::{File, OpenOptions, metadata};
 use std::io::prelude::*;
 use std::process::{Command, Stdio};
 use std::collections::HashMap;
-use std::cmp::max;
-use std::borrow::Cow;
-
 use table::row::Row;
 use table::Table;
 use table::cell::Cell;
@@ -165,8 +162,6 @@ fn main() {
 
 fn list() {
     let entries = get_entries();
-    let mut longest_key = 0;
-    let mut longest_total = 0;
 
     let mut commands = Vec::new();
     let mut paths = Vec::new();
@@ -200,13 +195,6 @@ fn list() {
     }
 
     table.print();
-}
-
-fn print_key_val(max_len: usize, max_key_len: usize, key: &String, val: &String) {
-    let padding_start = str::repeat(" ", max_key_len - key.len());
-    let padding_end = str::repeat(" ",
-                                  max_len - padding_start.len() - key.len() - val.len() - 7);
-    println!("| {}{} = {}{} |", padding_start, key, val, padding_end);
 }
 
 fn run(key: &str, args: Option<Vec<String>>) {

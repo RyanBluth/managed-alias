@@ -1,13 +1,12 @@
 pub mod row;
 pub mod cell;
 
-use table::cell::Cell;
 use table::row::Row;
 
 use std::cmp::max;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
-enum RowPosition {
+pub enum RowPosition {
     First,
     Mid,
     Last,
@@ -36,8 +35,8 @@ impl TableStyle {
                    bottom_right_corner: '+',
                    outer_left_vertical: '+',
                    outer_right_vertical: '+',
-                   outer_bottom_horizontal: '-',
-                   outer_top_horizontal: '-',
+                   outer_bottom_horizontal: '+',
+                   outer_top_horizontal: '+',
                    intersection: '+',
                    vertical: '|',
                    horizontal: '-',
@@ -60,7 +59,7 @@ impl TableStyle {
                };
     }
 
-    pub fn start_for_position(&self, pos: RowPosition) -> char {
+    fn start_for_position(&self, pos: RowPosition) -> char {
         match pos {
             RowPosition::First => self.top_left_corner,
             RowPosition::Mid => self.outer_left_vertical,
@@ -68,7 +67,7 @@ impl TableStyle {
         }
     }
 
-    pub fn end_for_position(&self, pos: RowPosition) -> char {
+    fn end_for_position(&self, pos: RowPosition) -> char {
         match pos {
             RowPosition::First => self.top_right_corner,
             RowPosition::Mid => self.outer_right_vertical,
@@ -76,7 +75,7 @@ impl TableStyle {
         }
     }
 
-    pub fn intersect_for_position(&self, pos: RowPosition) -> char {
+    fn intersect_for_position(&self, pos: RowPosition) -> char {
         match pos {
             RowPosition::First => self.outer_top_horizontal,
             RowPosition::Mid => self.intersection,
@@ -84,7 +83,7 @@ impl TableStyle {
         }
     }
 
-    pub fn merge_intersection_for_position(&self,
+    fn merge_intersection_for_position(&self,
                                            top: char,
                                            bottom: char,
                                            pos: RowPosition)
@@ -159,7 +158,6 @@ impl<'data> Table<'data> {
     pub fn print(&mut self) {
         let mut print_buffer = String::new();
         let max_widths = self.calculate_max_column_widths();
-        let total_width = max_widths.iter().sum::<usize>() + 4;
         let mut previous_separator = None;
         if self.rows.len() > 0 {
             for i in 0..self.rows.len() {

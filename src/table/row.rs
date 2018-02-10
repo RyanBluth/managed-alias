@@ -35,7 +35,6 @@ impl<'data> Row<'data> {
         buf.push(style.start_for_position(row_position));
 
         for i in 0..max_widths.len() {
-            let buf_len = buf.chars().count();
             if i == next_intersection {
                 buf.push(style.intersect_for_position(row_position));
 
