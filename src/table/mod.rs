@@ -27,6 +27,7 @@ pub struct TableStyle {
 }
 
 impl TableStyle {
+
     pub fn simple() -> TableStyle {
         return TableStyle {
                    top_left_corner: '+',
@@ -94,7 +95,9 @@ impl TableStyle {
         } else if(top == self.intersection || top == self.outer_top_horizontal) &&
                   bottom == self.horizontal {
             return self.outer_bottom_horizontal;
-        } else {
+        } else if top == self.outer_bottom_horizontal && bottom == self.horizontal{
+            return self.horizontal;
+        }else {
             return self.intersect_for_position(pos);
         }
     }
@@ -118,41 +121,6 @@ impl<'data> Table<'data> {
 
     pub fn add_row(&mut self, row: Row<'data>) {
         self.rows.push(row);
-    }
-
-    pub fn format_row(&self, row: &Row<'data>, max_widths: &Vec<usize>) -> String {
-        let mut buf = String::new();
-        let mut span_count = 1;
-        let mut col_idx = 0;
-        for width in max_widths.into_iter() {
-            if row.cells.len() > col_idx {
-                if span_count == 1 {
-                    let mut pad_len = 0;
-                    if *width > row.cells[col_idx].width() {
-                        pad_len = width - row.cells[col_idx].width();
-                    }
-
-                    buf.push_str(format!("{}{}{}",
-                                         self.style.vertical,
-                                         row.cells[col_idx],
-                                         str::repeat(" ", pad_len))
-                                         .as_str());
-                } else {
-                    buf.push_str(format!("{} ", str::repeat(" ", *width)).as_str());
-                }
-                if span_count < row.cells[col_idx].col_span {
-                    span_count += 1;
-                } else {
-                    span_count = 1;
-                    col_idx += 1;
-                }
-            } else {
-                buf.push_str(format!("{}{}", self.style.vertical, str::repeat(" ", *width))
-                                 .as_str());
-            }
-        }
-        buf.push(self.style.vertical);
-        return buf;
     }
 
     pub fn print(&mut self) {
@@ -187,7 +155,64 @@ impl<'data> Table<'data> {
         }
     }
 
-    pub fn calculate_max_column_widths(&self) -> Vec<usize> {
+
+    fn format_row(&self, row: &Row<'data>, max_widths: &Vec<usize>) -> String {
+        let mut buf = String::new();
+
+        // Number of columns spanned since the last cell
+        let mut columns_spanned = 0;
+
+        // The index of the current column. The length of max_widths may be larger
+        // than the length of the row's cells if any of the cells have a col_span value > 1
+        let mut current_column = 0;
+
+        for width in max_widths.iter() {
+
+            // This row may not have as many cells as there are columns
+            if row.cells.len() > current_column {
+
+                // We print the cell value when a new cell begins
+                if columns_spanned == 0 {
+
+                    let mut pad_len = 0;
+
+                    // Pad the cell if the length of the text is less than the max column width
+                    if *width > row.cells[current_column].width() {
+                        pad_len = width - row.cells[current_column].width();
+                    }
+
+                    buf.push_str(format!("{}{}{}",
+                                         self.style.vertical,
+                                         row.cells[current_column],
+                                         str::repeat(" ", pad_len))
+                                         .as_str());
+                } else {
+                    // If the cell spans multiple columns, just fill the remaining space with whitespace
+                    buf.push_str(format!("{} ", str::repeat(" ", *width)).as_str());
+                }
+
+                columns_spanned += 1;
+
+                // Check to see if we have spanned the cell yet
+                if columns_spanned == row.cells[current_column].col_span{
+                    columns_spanned = 0;
+                    current_column += 1;
+                }
+            } else {
+                // if columns_spanned == row.cells.len(){
+                //         buf.push(self.style.vertical);
+                // }
+                    
+                // This is just prints a blank cell since we don't have a value
+                buf.push_str(format!("{}{}", self.style.vertical, str::repeat(" ", *width))
+                                 .as_str());
+            }
+        }
+        buf.push(self.style.vertical);
+        return buf;
+    }
+
+    fn calculate_max_column_widths(&self) -> Vec<usize> {
         let mut max_widths: Vec<usize> = Vec::new();
         for row in &self.rows {
             for i in 0..row.cells.len() {
@@ -201,7 +226,7 @@ impl<'data> Table<'data> {
         return max_widths;
     }
 
-    pub fn buffer_line(buffer: &mut String, line: &String) {
+    fn buffer_line(buffer: &mut String, line: &String) {
         buffer.push_str(format!("{}\n", line).as_str());
     }
 }
