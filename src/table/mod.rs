@@ -199,10 +199,6 @@ impl<'data> Table<'data> {
                     current_column += 1;
                 }
             } else {
-                // if columns_spanned == row.cells.len(){
-                //         buf.push(self.style.vertical);
-                // }
-                    
                 // This is just prints a blank cell since we don't have a value
                 buf.push_str(format!("{}{}", self.style.vertical, str::repeat(" ", *width))
                                  .as_str());
