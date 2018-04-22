@@ -1,6 +1,5 @@
 extern crate clap;
-
-mod table;
+extern crate term_table;
 
 use clap::{App, AppSettings, Arg, SubCommand};
 
@@ -10,9 +9,9 @@ use std::fs::{metadata, File, OpenOptions};
 use std::io::prelude::*;
 use std::process::{Command, Stdio};
 use std::collections::HashMap;
-use table::row::Row;
-use table::Table;
-use table::cell::Cell;
+use term_table::row::Row;
+use term_table::Table;
+use term_table::cell::Cell;
 
 const GO: &'static str = "go";
 const SET: &'static str = "set";
@@ -182,7 +181,7 @@ fn list() {
         table.add_row(Row::new(vec![command.0, command.1]));
     }
 
-    table.print();
+    println!("{}", table.as_string());
 
     println!(" ");
 
@@ -194,37 +193,7 @@ fn list() {
         table.add_row(Row::new(vec![path.0, path.1]));
     }
 
-    table.print();
-
-    table = Table::new();
-    table.add_row(Row::new(vec![
-        Cell::new("asdasff", 2),
-        Cell::new("ffdasdasdasff", 1),
-        Cell::new("ffqqqqdasdasff", 2),
-        Cell::new("ffdasdasdasff", 1),
-    ]));
-    table.add_row(Row::new(vec![
-        Cell::new("fasdsadff", 1),
-        Cell::new("fff", 1),
-        Cell::new("fff", 1),
-    ]));
-    table.add_row(Row::new(vec![
-        Cell::new("fasdaff", 1),
-        Cell::new("fff", 1),
-        Cell::new("fff", 1),
-    ]));
-    table.add_row(Row::new(vec![
-        Cell::new("fasdff", 3),
-        Cell::new("fffdff", 4),
-    ]));
-    table.add_row(Row::new(vec![
-        Cell::new("fasdsaff", 1),
-        Cell::new("fff", 1),
-        Cell::new("fff", 1),
-    ]));
-    table.add_row(Row::new(vec![Cell::new("fasdsaff", 1)]));
-    table.add_row(Row::new(vec![Cell::new("fasdsaff", 15)]));
-    table.print();
+    println!("{}", table.as_string());
 }
 
 fn run(key: &str, args: Option<Vec<String>>) {
