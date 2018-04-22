@@ -5,8 +5,8 @@ mod table;
 use clap::{App, AppSettings, Arg, SubCommand};
 
 use std::process;
-use std::fmt::{Display};
-use std::fs::{File, OpenOptions, metadata};
+use std::fmt::Display;
+use std::fs::{metadata, File, OpenOptions};
 use std::io::prelude::*;
 use std::process::{Command, Stdio};
 use std::collections::HashMap;
@@ -36,13 +36,13 @@ impl GenericError {
 }
 
 impl<T> From<T> for GenericError
-    where T: Display
+where
+    T: Display,
 {
     fn from(x: T) -> Self {
         return GenericError::new(format!("{}", x));
     }
 }
-
 
 fn main() {
     let matches = App::new("managed-alias")
@@ -195,52 +195,80 @@ fn list() {
     }
 
     table.print();
+
+    table = Table::new();
+    table.add_row(Row::new(vec![
+        Cell::new("asdasff", 2),
+        Cell::new("ffdasdasdasff", 1),
+        Cell::new("ffqqqqdasdasff", 2),
+        Cell::new("ffdasdasdasff", 1),
+    ]));
+    table.add_row(Row::new(vec![
+        Cell::new("fasdsadff", 1),
+        Cell::new("fff", 1),
+        Cell::new("fff", 1),
+    ]));
+    table.add_row(Row::new(vec![
+        Cell::new("fasdaff", 1),
+        Cell::new("fff", 1),
+        Cell::new("fff", 1),
+    ]));
+    table.add_row(Row::new(vec![
+        Cell::new("fasdff", 3),
+        Cell::new("fffdff", 4),
+    ]));
+    table.add_row(Row::new(vec![
+        Cell::new("fasdsaff", 1),
+        Cell::new("fff", 1),
+        Cell::new("fff", 1),
+    ]));
+    table.add_row(Row::new(vec![Cell::new("fasdsaff", 1)]));
+    table.add_row(Row::new(vec![Cell::new("fasdsaff", 15)]));
+    table.print();
 }
 
 fn run(key: &str, args: Option<Vec<String>>) {
     match lookup(key) {
-        Some(value) => {
-            for command in value.split("&") {
-                let mut out_args: Vec<String> = command
-                    .split_whitespace()
-                    .map(|s| String::from(s))
-                    .collect::<Vec<String>>();
-                if let Some(arg_vec) = args.clone() {
-                    let mut joined_args = String::new();
-                    for arg in &arg_vec {
-                        joined_args.push_str(arg.clone().as_str());
-                        joined_args.push(' ');
-                    }
-                    joined_args.pop();
+        Some(value) => for command in value.split("&") {
+            let mut out_args: Vec<String> = command
+                .split_whitespace()
+                .map(|s| String::from(s))
+                .collect::<Vec<String>>();
+            if let Some(arg_vec) = args.clone() {
+                let mut joined_args = String::new();
+                for arg in &arg_vec {
+                    joined_args.push_str(arg.clone().as_str());
+                    joined_args.push(' ');
+                }
+                joined_args.pop();
 
-                    for arg in out_args.clone().iter().enumerate() {
-                        let mut current = arg.1.clone();
-                        for i in 0..arg_vec.len() {
-                            let token = format!("${}", i);
-                            current = current.replace(token.as_str(), arg_vec[i].as_str());
-                        }
-                        current = current.replace("$*", joined_args.as_str());
-                        out_args[arg.0] = current;
+                for arg in out_args.clone().iter().enumerate() {
+                    let mut current = arg.1.clone();
+                    for i in 0..arg_vec.len() {
+                        let token = format!("${}", i);
+                        current = current.replace(token.as_str(), arg_vec[i].as_str());
+                    }
+                    current = current.replace("$*", joined_args.as_str());
+                    out_args[arg.0] = current;
+                }
+            }
+            let mut arg_iter = out_args.iter();
+            match Command::new(arg_iter.next().unwrap())
+                .args(arg_iter)
+                .stdout(Stdio::inherit())
+                .spawn()
+            {
+                Ok(mut child) => {
+                    if let Err(e) = child.wait() {
+                        exit_with_message(format!(
+                            "Failed to wait for command {}. Error: {}",
+                            command, e
+                        ));
                     }
                 }
-                let mut arg_iter = out_args.iter();
-                match Command::new(arg_iter.next().unwrap())
-                          .args(arg_iter)
-                          .stdout(Stdio::inherit())
-                          .spawn() {
-                    Ok(mut child) => {
-                        if let Err(e) = child.wait() {
-                            exit_with_message(format!("Failed to wait for command {}. Error: {}",
-                                                      command,
-                                                      e));
-                        }
-                    }
-                    Err(e) => {
-                        exit_with_message(format!("Failed to execute {}. Error: {}", command, e))
-                    }
-                };
-            }
-        }
+                Err(e) => exit_with_message(format!("Failed to execute {}. Error: {}", command, e)),
+            };
+        },
         None => exit_invalid_key(key),
     }
 }
@@ -318,19 +346,26 @@ fn write_entries(entries: HashMap<String, String>) {
         out.push_str(format_entry(&entry.0, &entry.1).as_str());
     }
     let mut file = match OpenOptions::new()
-              .write(true)
-              .create(true)
-              .truncate(true)
-              .read(true)
-              .open(get_file_dir()) {
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .read(true)
+        .open(get_file_dir())
+    {
         Ok(file) => file,
         Err(e) => {
-            exit_with_message(format!("Failed to create file {}. Error: {}", STORE_FILE, e));
+            exit_with_message(format!(
+                "Failed to create file {}. Error: {}",
+                STORE_FILE, e
+            ));
             return;
         }
     };
     if let Err(e) = file.write_all(out.as_bytes()) {
-        exit_with_message(format!("Failed to write value to {}. Error: {}", STORE_FILE, e));
+        exit_with_message(format!(
+            "Failed to write value to {}. Error: {}",
+            STORE_FILE, e
+        ));
     };
 }
 
@@ -343,7 +378,8 @@ fn exit_invalid_key(key: &str) {
 }
 
 fn exit_with_message<T>(message: T)
-    where T: Display
+where
+    T: Display,
 {
     println!("{}", message);
     process::exit(1);
