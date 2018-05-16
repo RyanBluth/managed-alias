@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["RyanBluth <ryanbluth93@gmail.com>"]
 
 [dependencies]
-term-table = { git = "https://github.com/RyanBluth/term-table-rs" }
+term-table = "0.1.3"
 
 [dependencies.clap]
 version = "2.26.2"
