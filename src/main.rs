@@ -229,6 +229,7 @@ fn run(key: &str, args: Option<Vec<String>>) {
             {
                 Ok(mut child) => {
                     if let Err(e) = child.wait() {
+
                         exit_with_message(format!(
                             "Failed to wait for command {}. Error: {}",
                             command, e
