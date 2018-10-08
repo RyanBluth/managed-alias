@@ -178,19 +178,17 @@ fn list() {
     table.add_row(Row::new(vec![Cell::new("COMMANDS", 2)]));
 
     for command in commands {
-        table.add_row(Row::new(vec![command.0, command.1]));
+        table.add_row(Row::new(vec![Cell::new(command.0, 1), Cell::new(command.1, 1)]));
     }
 
-    println!("{}", table.as_string());
-
-    println!(" ");
+    println!("{}\n", table.as_string());
 
     table = Table::new();
 
     table.add_row(Row::new(vec![Cell::new("PATHS", 2)]));
 
     for path in paths {
-        table.add_row(Row::new(vec![path.0, path.1]));
+        table.add_row(Row::new(vec![Cell::new(path.0, 1), Cell::new(path.1, 1)]));
     }
 
     println!("{}", table.as_string());
